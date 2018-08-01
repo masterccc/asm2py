@@ -43,7 +43,7 @@ def gen_runner():
 	runner = ""
 	runner += gen_instruction("def goto(i): #i know i'll go to hell for that")
 	runner += gen_instruction("\tglobal eip",1)
-	runner += gen_instruction("\teip += 1",1,1)
+	runner += gen_instruction("\teip = i",1,1)
 
 	runner += gen_instruction("while(eip < len(ins)):")
 	runner += gen_instruction("print('eip : ', eip, 'inst: ', ins[eip])",1)
