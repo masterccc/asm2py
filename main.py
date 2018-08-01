@@ -17,26 +17,40 @@ def gen_header(filename, funcname):
 	header += gen_instruction("#Create Stack")
 	header += gen_instruction("stack = list()",0,1)
 
-	header += gen_instruction("#Create .text")
-	header += gen_instruction("ins = []",0,1)
-
 	header += gen_instruction("#Create registers")
-	header += gen_instruction(
-		"eax = ebx = ecx = edx"
-		" = edi = esi = eip = 0",0,1)
 
-	header += gen_instruction("# user defined functions")
+	# manage AL, AH...
+	regs = ["eax","ebx","ecx","edx",
+			"edi","esi","eip","esp","ebp"]
+
+	header += gen_instruction( "=".join(regs) + "=0",0,1)
+
+	header += gen_instruction("def print_regs():")
+	header += gen_instruction("print('Registers Dump')",1)
+	header += gen_instruction("for reg in " + str(regs) + ":",1)
+	header += gen_instruction("print(reg, '=', eval(reg))",2,1)
+
+#	header += gen_instruction("# user defined functions")
+
+	header += gen_instruction("#Create .text")
+	header += gen_instruction("ins = [")
+
 	return header
 
 
 def gen_runner():
 
 	runner = ""
-	runner += gen_instruction("while(True):")
-	runner += gen_instruction("print('eip : ', eip, 'inst: ', i[eip], end='')",1)
-	runner += gen_instruction("exec(i[eip])",1)
-	runner += gen_instruction("eip+=1",1)
-	runner += gen_instruction("print('[DONE]')",1)
+	runner += gen_instruction("def goto(i): #i know i'll go to hell for that")
+	runner += gen_instruction("\tglobal eip",1)
+	runner += gen_instruction("\teip += 1",1,1)
+
+	runner += gen_instruction("while(eip < len(ins)):")
+	runner += gen_instruction("print('eip : ', eip, 'inst: ', ins[eip], end='')",1)
+	runner += gen_instruction("exec(ins[eip])",1)
+	runner += gen_instruction("eip+=1",1,1)
+
+	runner += gen_instruction("print_regs()")
 	return runner
 
 
@@ -86,12 +100,29 @@ def get_raw_func(raw_asm,func_name):
 
 def analyze(raw_func, ofile):
 
+	global func_name_analyze
+
+	jmp_re = r'<' + func_name_analyze +'+0x[0-9a-z]+>'
+	jmp_re_c = re.compile(jmp_re)
+
 	raw_func = bulk_transform(raw_func)
 	instructions = ""
 	for line in raw_func.split("\n"):
-		opcodes = " ".join(line.split()[2:])
-		instructions += opcodes + '\n'
-	f.write(instructions)
+		if line == "":
+			continue
+		
+		opcodes = " ".join(line.split()[2:]) # default (copy)
+		
+		#if(jmp_re_c.search() != False):
+		# opcode like 'call 00001040 <strcmp@plt>'
+		#je     10f8 <deregister_tm_clones+0x38>
+		#call   1050 <__libc_start_main@plt>
+		#func_name_analyze
+		
+		instructions += "\t'" + opcodes + "',\n"
+	instructions += "]\n" # end of ins
+	ofile.write(instructions)
+
 
 def bulk_transform(raw_func):
 
