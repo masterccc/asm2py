@@ -46,7 +46,7 @@ def gen_runner():
 	runner += gen_instruction("\teip += 1",1,1)
 
 	runner += gen_instruction("while(eip < len(ins)):")
-	runner += gen_instruction("print('eip : ', eip, 'inst: ', ins[eip], end='')",1)
+	runner += gen_instruction("print('eip : ', eip, 'inst: ', ins[eip])",1)
 	runner += gen_instruction("exec(ins[eip])",1)
 	runner += gen_instruction("eip+=1",1,1)
 
@@ -100,9 +100,9 @@ def get_raw_func(raw_asm,func_name):
 
 def analyze(raw_func, ofile):
 
-	global func_name_analyze
+	global cur_func
 
-	jmp_re = r'<' + func_name_analyze +'+0x[0-9a-z]+>'
+	jmp_re = r'<' + cur_func +'+0x[0-9a-z]+>'
 	jmp_re_c = re.compile(jmp_re)
 
 	raw_func = bulk_transform(raw_func)
@@ -117,7 +117,7 @@ def analyze(raw_func, ofile):
 		# opcode like 'call 00001040 <strcmp@plt>'
 		#je     10f8 <deregister_tm_clones+0x38>
 		#call   1050 <__libc_start_main@plt>
-		#func_name_analyze
+		#cur_func
 		
 		instructions += "\t'" + opcodes + "',\n"
 	instructions += "]\n" # end of ins
@@ -126,6 +126,7 @@ def analyze(raw_func, ofile):
 
 def bulk_transform(raw_func):
 
+	global cur_func
 	raw_func = re.sub(r"( |\t){2,}"," ", raw_func)
 
 	bulk_dict = [
@@ -134,14 +135,23 @@ def bulk_transform(raw_func):
 		{"from" : r"mov ([a-z]+),([0-9a-z]*)", "to":r"\1 = \2"},
 		{"from" : r"xchg ([a-z]+),([a-z]+)", "to":r"\1, \2 = \2, \1"},
 		{"from" : r"ret", "to":r"sys.exit(0)"},
-		##jmp 000012b9 <main+0xd0>
 		
+		#Control flow
+		{
+			"from" : r"(call|jmp) [0-9a-f]+ <"+cur_func+"\+(0x[0-9a-f]+)>",
+			"to":r"goto(\2)"
+		},
+		#jmp 000012b9 <main+0xd0>
+		# opcode like 'call 00001040 <strcmp@plt>'
+		#je     10f8 <deregister_tm_clones+0x38>
+		#call   1050 <__libc_start_main@plt>
+
 		#Bitwise
-		{"from" : r"shr ([a-z]+),([0-9a-z]*)", "to":r"\1 = \1 >> \2"},
-		{"from" : r"shl ([a-z]+),([0-9a-z]*)", "to":r"\1 = \1 << \2"},
-		{"from" : r"xor ([a-z]+),([0-9a-z]*)", "to":r"\1 ^= \2"},
-		{"from" : r"and ([a-z]+),([0-9a-z]*)", "to":r"\1 &= \2"},
-		{"from" : r"or ([a-z]+),([0-9a-z]*)", "to":r"\1 \|= \2"},
+		{"from" : r"shr ([a-z]+),([x0-9a-z]*)", "to":r"\1 = \1 >> \2"},
+		{"from" : r"shl ([a-z]+),([x0-9a-z]*)", "to":r"\1 = \1 << \2"},
+		{"from" : r"xor ([a-z]+),([x0-9a-z]*)", "to":r"\1 ^= \2"},
+		{"from" : r"and ([a-z]+),([x0-9a-z]*)", "to":r"\1 &= \2"},
+		{"from" : r"or ([a-z]+),([x0-9a-z]*)", "to":r"\1 \|= \2"},
 
 		#Basic operations
 		{"from" : r"add ([a-z]+),([0-9a-z]*)", "to":r"\1 += \2"},
@@ -172,13 +182,13 @@ if(len(sys.argv) < 2):
 raw_asm = os.popen(DUMP_CMD + " " + sys.argv[1])
 raw_asm = raw_asm.read()
 
-func_name_analyze = choose_func(get_func_list(raw_asm))
-print("Function :", func_name_analyze)
+cur_func = choose_func(get_func_list(raw_asm))
+print("Function :", cur_func)
 
-raw_func = get_raw_func(raw_asm,func_name_analyze)
+raw_func = get_raw_func(raw_asm,cur_func)
 #print(raw_func)
 
-output_file = create_script(sys.argv[1], func_name_analyze)
+output_file = create_script(sys.argv[1], cur_func)
 
 analyze(raw_func, output_file)
 
