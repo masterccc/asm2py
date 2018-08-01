@@ -2,8 +2,6 @@
 
 import os, sys, re
 
-
-
 def gen_instruction(txt, tab=0, nl=0):
 	return tab * "\t" + txt + "\n" + nl * "\n"
 
@@ -14,15 +12,34 @@ def gen_header(filename, funcname):
 	header += gen_instruction("# Binary : " + filename)
 	header += gen_instruction("# Function : " + funcname, 0, 2)
 
+	header += gen_instruction("import sys",0,1)
+
 	header += gen_instruction("#Create Stack")
 	header += gen_instruction("stack = list()",0,1)
 
-	header += gen_instruction("#Create registers")
-	header += gen_instruction("eax = ebx = ecx = edx = 0",0,1)
+	header += gen_instruction("#Create .text")
+	header += gen_instruction("ins = []",0,1)
 
-	header += gen_instruction("# .text section")
+	header += gen_instruction("#Create registers")
+	header += gen_instruction(
+		"eax = ebx = ecx = edx"
+		" = edi = esi = eip = 0",0,1)
+
+	header += gen_instruction("# user defined functions")
 	return header
-#
+
+
+def gen_runner():
+
+	runner = ""
+	runner += gen_instruction("while(True):")
+	runner += gen_instruction("print('eip : ', eip, 'inst: ', i[eip], end='')",1)
+	runner += gen_instruction("exec(i[eip])",1)
+	runner += gen_instruction("eip+=1",1)
+	runner += gen_instruction("print('[DONE]')",1)
+	return runner
+
+
 def create_script(filename, funcname):
 	output_name = filename + "::" + funcname + ".py"
 	file = open(output_name, "w")
@@ -69,36 +86,41 @@ def get_raw_func(raw_asm,func_name):
 
 def analyze(raw_func, ofile):
 
-
 	raw_func = bulk_transform(raw_func)
-
+	instructions = ""
 	for line in raw_func.split("\n"):
 		opcodes = " ".join(line.split()[2:])
-		ofile.write(opcodes + '\n')
+		instructions += opcodes + '\n'
+	f.write(instructions)
 
 def bulk_transform(raw_func):
 
-
 	raw_func = re.sub(r"( |\t){2,}"," ", raw_func)
-	#raw_func = re.sub(" +"," ", raw_func)
-	
+
 	bulk_dict = [
 
 		# General 
-		{"from" : r"mov ([a-z]{3}),([0-9a-z]*)", "to":r"\1 = \2"},
+		{"from" : r"mov ([a-z]+),([0-9a-z]*)", "to":r"\1 = \2"},
+		{"from" : r"xchg ([a-z]+),([a-z]+)", "to":r"\1, \2 = \2, \1"},
+		{"from" : r"ret", "to":r"sys.exit(0)"},
+		##jmp 000012b9 <main+0xd0>
 		
 		#Bitwise
-		{"from" : r"shr ([a-z]{3}),([0-9a-z]*)", "to":r"\1 = \1 >> \2"},
-		{"from" : r"shl ([a-z]{3}),([0-9a-z]*)", "to":r"\1 = \1 << \2"},
-		{"from" : r"xor ([a-z]{3}),([0-9a-z]*)", "to":r"\1 ^= \2"},
+		{"from" : r"shr ([a-z]+),([0-9a-z]*)", "to":r"\1 = \1 >> \2"},
+		{"from" : r"shl ([a-z]+),([0-9a-z]*)", "to":r"\1 = \1 << \2"},
+		{"from" : r"xor ([a-z]+),([0-9a-z]*)", "to":r"\1 ^= \2"},
+		{"from" : r"and ([a-z]+),([0-9a-z]*)", "to":r"\1 &= \2"},
+		{"from" : r"or ([a-z]+),([0-9a-z]*)", "to":r"\1 \|= \2"},
 
 		#Basic operations
-		{"from" : r"add ([a-z]{3}),([0-9a-z]*)", "to":r"\1 += \2"},
-		{"from" : r"sub ([a-z]{3}),([0-9a-z]*)", "to":r"\1 -= \2"},
-		
+		{"from" : r"add ([a-z]+),([0-9a-z]*)", "to":r"\1 += \2"},
+		{"from" : r"sub ([a-z]+),([0-9a-z]*)", "to":r"\1 -= \2"},
+		{"from" : r"inc ([a-z]+)", "to":r"\1 += 1"},
+		{"from" : r"dec ([a-z]+)", "to":r"\1 -= 1"},
+
 		# Stack
-		{"from" : r"push ([a-z]{3})", "to": r"stack.append(\1)"},
-		{"from" : r"pop ([a-z]{3})", "to": r"\1 = stack.pop()"}
+		{"from" : r"push ([a-z0-9]+)", "to": r"stack.append(\1)"},
+		{"from" : r"pop ([a-z]+)", "to": r"\1 = stack.pop()"}
 	#	{"from": "a", "to": "d"}
 	]
 
@@ -129,6 +151,8 @@ output_file = create_script(sys.argv[1], func_name_analyze)
 
 analyze(raw_func, output_file)
 
+
+output_file.write(gen_runner())
 output_file.close()
 
 
