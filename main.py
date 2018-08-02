@@ -17,8 +17,26 @@ def gen_header(filename, funcname):
 	header += gen_instruction("#Create Stack")
 	header += gen_instruction("stack = list()",0,1)
 
-	header += gen_instruction("#Create registers")
+	header += gen_instruction("#Create flags")
+	flags = ["FZ","FC"]
+	header += gen_instruction( "=".join(flags) + "=0",0,1)
+	
+	header += gen_instruction("def cmp(x,y):")
+	header += gen_instruction("global FZ",1)
+	header += gen_instruction("FZ = true if x == y else False",1,1)
 
+	header += gen_instruction("def je(addr):")
+	header += gen_instruction("global FZ",1)
+	header += gen_instruction("if(FZ):",1)
+	header += gen_instruction("goto(addr)",2)
+	header += gen_instruction("jz = je",0,1)
+
+	header += gen_instruction("def jne(addr):")
+	header += gen_instruction("global FZ",1)
+	header += gen_instruction("if(not FZ):",1)
+	header += gen_instruction("goto(addr)",2)
+
+	header += gen_instruction("#Create registers")
 	# manage AL, AH...
 	regs = ["eax","ebx","ecx","edx",
 			"edi","esi","eip","esp","ebp"]
@@ -135,12 +153,21 @@ def bulk_transform(raw_func):
 		{"from" : r"mov ([a-z]+),([0-9a-z]*)", "to":r"\1 = \2"},
 		{"from" : r"xchg ([a-z]+),([a-z]+)", "to":r"\1, \2 = \2, \1"},
 		{"from" : r"ret", "to":r"sys.exit(0)"},
-		
+		{"from" : r"lea ([a-z]+),\[([0-9a-z\-\*\+]+)\]","to":r"\1 = \2"},
+		{"from" : r"(cmp|test) ([a-z]+),([0-9a-z]+)","to":r"cmp(\2,\3)"},
 		#Control flow
 		{
 			"from" : r"(call|jmp) [0-9a-f]+ <"+cur_func+"\+(0x[0-9a-f]+)>",
 			"to":r"goto(\2)"
 		},
+
+		{
+			"from" : r"(je|jne|jz) [0-9a-f]+ <"+cur_func+"\+(0x[0-9a-f]+)>",
+			"to":r"\1(\2)"
+		},
+
+
+
 		#jmp 000012b9 <main+0xd0>
 		# opcode like 'call 00001040 <strcmp@plt>'
 		#je     10f8 <deregister_tm_clones+0x38>
