@@ -6,8 +6,11 @@
 
 import os, sys, re
 
+TAB_SIZE = 4
+TAB = 4 * " "
+
 def gen_instruction(txt, tab=0, nl=0):
-	return tab * "\t" + txt + "\n" + nl * "\n"
+	return tab * TAB + txt + "\n" + nl * "\n"
 
 def gen_header(filename, funcname):
 	
@@ -73,8 +76,8 @@ def gen_runner():
 
 	runner = ""
 	runner += gen_instruction("def goto(i): #i know i'll go to hell for that")
-	runner += gen_instruction("\tglobal eip",1)
-	runner += gen_instruction("\teip = i",1,1)
+	runner += gen_instruction("global eip",1)
+	runner += gen_instruction("eip = i",1,1)
 
 	runner += gen_instruction("jmp = call = goto")
 
@@ -131,6 +134,7 @@ def get_raw_func(raw_asm,func_name):
 			raw += line + "\n"
 	return raw
 
+space_padding = lambda line : 40 - len(line)
 
 def analyze(raw_func, ofile):
 
@@ -148,7 +152,8 @@ def analyze(raw_func, ofile):
 		
 		opcodes = " ".join(line.split()[2:]) # default (copy)
 		
-		instructions += "\t'" + opcodes + "',\t\t\t"+ str(line_nr) +"\n"
+		instructions += TAB + "'"+ opcodes + "',"
+		instructions += " " * space_padding(opcodes)+ "#" + str(hex(line_nr)) +"\n"
 		line_nr += 1
 	instructions += "]\n" # end of ins
 	ofile.write(instructions)
