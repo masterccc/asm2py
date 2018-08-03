@@ -2,7 +2,9 @@
 
 # Todo:
 # eax -> ax -> ah/al
+# op code jg/jl
 # opcode hex/dec,hex/dec
+# corriger list func 
 
 import os, sys, re
 
@@ -25,14 +27,25 @@ def gen_header(filename, funcname):
 	header += gen_instruction("stack = list()",0,1)
 
 	header += gen_instruction("#Create flags")
-	flags = ["FZ","FC"]
+	flags = ["FZ","FN"]
 	header += gen_instruction( "=".join(flags) + "=0",0,1)
 	
 	header += gen_instruction("def cmp(x,y):")
 	header += gen_instruction("global FZ",1)
-	header += gen_instruction("FZ = True if x == y else False",1,1)
+	header += gen_instruction("FZ = True if x == y else False",1)
+	header += gen_instruction("FN = True if ( (x-y) < 0) else False",1,1)
 
 	header += gen_instruction("test = cmp")
+
+	header += gen_instruction("def jg(addr):")
+	header += gen_instruction("global FN",1)
+	header += gen_instruction("if(not FN):",1)
+	header += gen_instruction("goto(addr-1)",2)
+
+	header += gen_instruction("def jl(addr):")
+	header += gen_instruction("global FN",1)
+	header += gen_instruction("if(FN):",1)
+	header += gen_instruction("goto(addr-1)",2)
 
 	header += gen_instruction("def je(addr):")
 	header += gen_instruction("global FZ",1)
@@ -176,7 +189,7 @@ def bulk_transform(raw_func):
 		
 		# Hexa
 		{
-			"from" : r"(call|jmp|jne|je|jz) [0-9a-f]+ <"+cur_func+"\+(0x[0-9a-f]+)>",
+			"from" : r"(call|jmp|jne|je|jz|jg|jl) [0-9a-f]+ <"+cur_func+"\+(0x[0-9a-f]+)>",
 			#"to": lambda m: m.group(1) + "(" + str( int(m.group(2),16) - 2) + ")" # -2 pour ajuster eip
 			"to":r'\1(\2)'
 		},
