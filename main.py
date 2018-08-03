@@ -1,5 +1,9 @@
 #!/usr/bin/python3
 
+# Todo:
+# eax -> ax -> ah/al
+# opcode hex/dec,hex/dec
+
 import os, sys, re
 
 def gen_instruction(txt, tab=0, nl=0):
@@ -23,18 +27,22 @@ def gen_header(filename, funcname):
 	
 	header += gen_instruction("def cmp(x,y):")
 	header += gen_instruction("global FZ",1)
-	header += gen_instruction("FZ = true if x == y else False",1,1)
+	header += gen_instruction("FZ = True if x == y else False",1,1)
+
+	header += gen_instruction("test = cmp")
 
 	header += gen_instruction("def je(addr):")
 	header += gen_instruction("global FZ",1)
 	header += gen_instruction("if(FZ):",1)
-	header += gen_instruction("goto(addr)",2)
+	header += gen_instruction("goto(addr-1)",2)
 	header += gen_instruction("jz = je",0,1)
 
 	header += gen_instruction("def jne(addr):")
 	header += gen_instruction("global FZ",1)
 	header += gen_instruction("if(not FZ):",1)
-	header += gen_instruction("goto(addr)",2)
+	header += gen_instruction("goto(addr-1)",2)
+
+	header += gen_instruction("nop = lambda : None",0,1)
 
 	header += gen_instruction("#Create registers")
 	# manage AL, AH...
@@ -48,7 +56,12 @@ def gen_header(filename, funcname):
 	header += gen_instruction("for reg in " + str(regs) + ":",1)
 	header += gen_instruction("print(reg, '=', eval(reg))",2,1)
 
-#	header += gen_instruction("# user defined functions")
+	header += gen_instruction("#Debug exemple for line 0 :")
+	header += gen_instruction("debug_instructions = { 0 : 'print(\"Debug starts\")'}",0,1)
+
+
+	header += gen_instruction("def come_from(ceip):")
+	header += gen_instruction("eval(debug_instructions.get(ceip,'nop()'))",1,1)
 
 	header += gen_instruction("#Create .text")
 	header += gen_instruction("ins = [")
@@ -63,8 +76,11 @@ def gen_runner():
 	runner += gen_instruction("\tglobal eip",1)
 	runner += gen_instruction("\teip = i",1,1)
 
+	runner += gen_instruction("jmp = call = goto")
+
 	runner += gen_instruction("while(eip < len(ins)):")
 	runner += gen_instruction("print('eip : ', eip, 'inst: ', ins[eip])",1)
+	runner += gen_instruction("come_from(eip)",1)
 	runner += gen_instruction("exec(ins[eip])",1)
 	runner += gen_instruction("eip+=1",1,1)
 
@@ -125,19 +141,15 @@ def analyze(raw_func, ofile):
 
 	raw_func = bulk_transform(raw_func)
 	instructions = ""
+	line_nr = 0
 	for line in raw_func.split("\n"):
 		if line == "":
 			continue
 		
 		opcodes = " ".join(line.split()[2:]) # default (copy)
 		
-		#if(jmp_re_c.search() != False):
-		# opcode like 'call 00001040 <strcmp@plt>'
-		#je     10f8 <deregister_tm_clones+0x38>
-		#call   1050 <__libc_start_main@plt>
-		#cur_func
-		
-		instructions += "\t'" + opcodes + "',\n"
+		instructions += "\t'" + opcodes + "',\t\t\t"+ str(line_nr) +"\n"
+		line_nr += 1
 	instructions += "]\n" # end of ins
 	ofile.write(instructions)
 
@@ -156,22 +168,18 @@ def bulk_transform(raw_func):
 		{"from" : r"lea ([a-z]+),\[([0-9a-z\-\*\+]+)\]","to":r"\1 = \2"},
 		{"from" : r"(cmp|test) ([a-z]+),([0-9a-z]+)","to":r"cmp(\2,\3)"},
 		#Control flow
+		
+		# Hexa
 		{
-			"from" : r"(call|jmp) [0-9a-f]+ <"+cur_func+"\+(0x[0-9a-f]+)>",
-			"to":r"goto(\2)"
+			"from" : r"(call|jmp|jne|je|jz) [0-9a-f]+ <"+cur_func+"\+(0x[0-9a-f]+)>",
+			#"to": lambda m: m.group(1) + "(" + str( int(m.group(2),16) - 2) + ")" # -2 pour ajuster eip
+			"to":r'\1(\2)'
 		},
-
-		{
-			"from" : r"(je|jne|jz) [0-9a-f]+ <"+cur_func+"\+(0x[0-9a-f]+)>",
-			"to":r"\1(\2)"
-		},
-
-
-
-		#jmp 000012b9 <main+0xd0>
-		# opcode like 'call 00001040 <strcmp@plt>'
-		#je     10f8 <deregister_tm_clones+0x38>
-		#call   1050 <__libc_start_main@plt>
+		#Decimal
+		#{
+		#	"from" : r"(call|jmp|jne|je|jz) [0-9a-f]+ <"+cur_func+"\+([0-9]+)>",
+		#	"to": lambda m: m.group(1) + "(" + str( int(m.group(2)) - 2) + ")" # -2 pour ajuster eip
+		#}, 
 
 		#Bitwise
 		{"from" : r"shr ([a-z]+),([x0-9a-z]*)", "to":r"\1 = \1 >> \2"},
