@@ -44,6 +44,10 @@ def gen_header(filename, funcname):
 
     header += wr_newline("test = cmp")
 
+    header += wr_newline("def jmp(addr):")
+    header += wr_newline("goto(addr-1)",1)
+    header += wr_newline("call = jmp",0,1)
+
     header += wr_newline("def jg(addr):")
     header += wr_newline("global FN",1)
     header += wr_newline("if(not FN):",1)
@@ -99,7 +103,6 @@ def gen_runner():
     runner += wr_newline("global eip",1)
     runner += wr_newline("eip = i",1,1)
 
-    runner += wr_newline("jmp = call = goto")
 
     runner += wr_newline("while(eip < len(ins)):")
     runner += wr_newline("print('eip : ', eip, 'inst: ', ins[eip])",1)
