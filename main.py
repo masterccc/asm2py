@@ -2,22 +2,28 @@
 
 # Todo:
 # eax -> ax -> ah/al
-# op code jg/jl
-# opcode hex/dec,hex/dec
-# corriger list func 
+# opcode reg/hex/dec,reg/hex/dec
+# read/write -> print/input
+# 0x.... -> .data string
+# regex \d \w etc..
 
 import os, sys, re
+
+DUMP_CMD="objdump -d -M intel --no-show-raw-insn --prefix-addresses"
 
 TAB_SIZE = 4
 TAB = 4 * " "
 
-DUMP_CMD="objdump -d -M intel --no-show-raw-insn --prefix-addresses"
+LINE_NR_PADDING = 40
 
 RE_FUNC_HDR = r'^[0-9a-f]+ <[a-zA-Z_]*>'
 RE_FUNC = r'^[0-9a-f]+ <[a-zA-Z_]*>'
 
 offset_index = {}
 
+trash_funcs = [
+    "__x86.get_pc_thunk.ax"
+]
 def wr_newline(txt, tab=0, nl=0):
     return tab * TAB + txt + "\n" + nl * "\n"
 
@@ -39,6 +45,7 @@ def gen_header(filename, funcname):
     
     header += wr_newline("def cmp(x,y):")
     header += wr_newline("global FZ",1)
+    header += wr_newline("global FN",1)
     header += wr_newline("FZ = True if x == y else False",1)
     header += wr_newline("FN = True if ( (x-y) < 0) else False",1,1)
 
@@ -158,12 +165,12 @@ def bind_offset_index(raw):
         index += 1
         if (index == 0) or (line==""):
             continue
-        print(line)
         offset_s = re.search(offset_re, line).group(1)
         offset_index[offset_s] = index
 
 def get_raw_func(raw_asm,func_name):
 
+    global trash_funcs
     raw = ""
 
     regex_func = r'^[0-9a-f]+ <'+ func_name +'([\+0x[a-f0-9]*)?>'
@@ -171,11 +178,17 @@ def get_raw_func(raw_asm,func_name):
     
     for line in raw_asm.split("\n"):
         if(regex_find.search(line)):
-            raw += line + "\n"
-    bind_offset_index(raw)
+            found_trash = False
+            for garbage in trash_funcs:
+                if(re.search(garbage,line)):
+                    found_trash = True
+                    break
+            if(not found_trash):
+                raw += line + "\n"
+
     return raw
 
-space_padding = lambda line : 40 - len(line)
+space_padding = lambda line : LINE_NR_PADDING - len(line)
 
 def analyze(raw_func, ofile):
 
@@ -206,29 +219,23 @@ def bulk_transform(raw_func):
 
     bulk_dict = [
 
-        # Pre-format
+        # Pre-format ( r12b, r12w, r12d  => r12)
         {"from": r"r([0-9]{2})[a-z]([ ,]?)", "to":r"r\1\2"},
 
         # General 
         {"from" : r"mov ([a-z]+),([0-9a-z]*)", "to":r"\1 = \2"},
         {"from" : r"xchg ([a-z]+),([a-z]+)", "to":r"\1, \2 = \2, \1"},
-        {"from" : r"ret", "to":r"sys.exit(0)"},
+        {"from" : r"ret", "to":r"print(\\'End\\')"},
         {"from" : r"lea ([a-z]+),\[([0-9a-z\-\*\+]+)\]","to":r"\1 = \2"},
         {"from" : r"(cmp|test) ([a-z]+),([0-9a-z]+)","to":r"cmp(\2,\3)"},
-        #Control flow
         
+        #Control flow
         # Hexa
         {
             "from" : r"(call|jmp|jne|je|jz|jg|jl) [0-9a-f]+ <"+cur_func+"\+(0x[0-9a-f]+)>",
-            #"to": lambda m: m.group(1) + "(" + str( int(m.group(2),16) - 2) + ")" # -2 pour ajuster eip
-           "to": lambda m: m.group(1) + "(" + str( offset_index.get(m.group(2),m.group(2))) + ")"
+            "to": lambda m: m.group(1) + "(" + str( offset_index.get(m.group(2),m.group(2))) + ")"
         },
-        #Decimal
-        #{
-        #   "from" : r"(call|jmp|jne|je|jz) [0-9a-f]+ <"+cur_func+"\+([0-9]+)>",
-        #   "to": lambda m: m.group(1) + "(" + str( int(m.group(2)) - 2) + ")" # -2 pour ajuster eip
-        #}, 
-
+       
         #Bitwise
         {"from" : r"shr ([a-z]+),([x0-9a-z]*)", "to":r"\1 = \1 >> \2"},
         {"from" : r"shl ([a-z]+),([x0-9a-z]*)", "to":r"\1 = \1 << \2"},
@@ -245,7 +252,7 @@ def bulk_transform(raw_func):
         # Stack
         {"from" : r"push ([a-z0-9]+)", "to": r"stack.append(\1)"},
         {"from" : r"pop ([a-z0-9]+)", "to": r"\1 = stack.pop()"}
-    #   {"from": "a", "to": "d"}
+
 ]
 
     for item in bulk_dict:
@@ -262,20 +269,17 @@ raw_asm = os.popen(DUMP_CMD + " " + sys.argv[1])
 raw_asm = raw_asm.read()
 
 cur_func = choose_func(get_func_list(raw_asm))
-print("Function :", cur_func)
-
-raw_func = get_raw_func(raw_asm,cur_func)
-#print(raw_func)
+print("Selected function :", cur_func)
 
 output_file = create_script(sys.argv[1], cur_func)
 
-analyze(raw_func, output_file)
+raw_func = get_raw_func(raw_asm,cur_func)
+bind_offset_index(raw_func)
 
+analyze(raw_func, output_file)
 
 output_file.write(gen_runner())
 output_file.close()
 
+print("Output file : ", sys.argv[1]+ '::' + cur_func + ".py")
 
-# convertir write en printf
-
-#dump strings dans un tableau data= { [offset] = "string" }
