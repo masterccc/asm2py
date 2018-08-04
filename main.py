@@ -1,6 +1,7 @@
 #!/usr/bin/python3
 
 # Todo:
+# op code: div/idiv mul/imul
 # eax -> ax -> ah/al
 # opcode reg/hex/dec,reg/hex/dec
 # read/write -> print/input
@@ -21,8 +22,9 @@ RE_FUNC = r'^[0-9a-f]+ <[a-zA-Z_]*>'
 
 offset_index = {}
 
+REMOVE_DWORD_PTR = True
 trash_funcs = [
-    "__x86.get_pc_thunk.ax"
+    "__x86.get_pc_thunk.ax", "cdq"
 ]
 def wr_newline(txt, tab=0, nl=0):
     return tab * TAB + txt + "\n" + nl * "\n"
@@ -60,10 +62,24 @@ def gen_header(filename, funcname):
     header += wr_newline("if(not FN):",1)
     header += wr_newline("goto(addr-1)",2)
 
+    header += wr_newline("def jge(addr):")
+    header += wr_newline("global FN",1)
+    header += wr_newline("global FZ",1)
+    header += wr_newline("if(not FN or FZ):",1)
+    header += wr_newline("goto(addr-1)",2)
+    header += wr_newline("jae = jge",0,1)
+
     header += wr_newline("def jl(addr):")
     header += wr_newline("global FN",1)
     header += wr_newline("if(FN):",1)
     header += wr_newline("goto(addr-1)",2)
+
+    header += wr_newline("def jle(addr):")
+    header += wr_newline("global FN",1)
+    header += wr_newline("global FZ",1)
+    header += wr_newline("if(FN or FZ):",1)
+    header += wr_newline("goto(addr-1)",2)
+    header += wr_newline("jbe = jle",0,1)
 
     header += wr_newline("def je(addr):")
     header += wr_newline("global FZ",1)
@@ -85,6 +101,10 @@ def gen_header(filename, funcname):
 
     header += wr_newline( "=".join(regs) + "=0",0,1)
 
+    # Local vars
+    header += wr_newline("# Local variables")
+    header += wr_newline( "".join(["locvar"+str(i)+"=0\n" for i in range(0,11)]),0,1)
+
     header += wr_newline("def print_regs():")
     header += wr_newline("print('Registers Dump')",1)
     header += wr_newline("for reg in " + str(regs) + ":",1)
@@ -92,7 +112,6 @@ def gen_header(filename, funcname):
 
     header += wr_newline("#Debug exemple for line 0 :")
     header += wr_newline("debug_instructions = { 0 : 'print(\"Debug starts\")'}",0,1)
-
 
     header += wr_newline("def come_from(ceip):")
     header += wr_newline("eval(debug_instructions.get(ceip,'nop()'))",1,1)
@@ -218,9 +237,19 @@ def bulk_transform(raw_func):
     raw_func = re.sub(r"( |\t){2,}"," ", raw_func)
 
     bulk_dict = [
-
-        # Pre-format ( r12b, r12w, r12d  => r12)
+        
+        # Pre-format
+        # Registers names( r12b, r12w, r12d  => r12)
         {"from": r"r([0-9]{2})[a-z]([ ,]?)", "to":r"r\1\2"},
+
+        # Remove DWORD_PTR
+        {"from": r"DWORD PTR ", "to": ""},
+        {
+            "from": r"\[ebp\+(0x[a-f0-9]+)\]",
+            "to": lambda m: "locvar" + str( int((int(m.group(1),16) / 4 -1)) )
+        },
+
+
 
         # General 
         {"from" : r"mov ([a-z]+),([0-9a-z]*)", "to":r"\1 = \2"},
@@ -232,7 +261,7 @@ def bulk_transform(raw_func):
         #Control flow
         # Hexa
         {
-            "from" : r"(call|jmp|jne|je|jz|jg|jl) [0-9a-f]+ <"+cur_func+"\+(0x[0-9a-f]+)>",
+            "from" : r"(call|jmp|jne|je|jz|jg|jl|jle|jbe|jge|jae) [0-9a-f]+ <"+cur_func+"\+(0x[0-9a-f]+)>",
             "to": lambda m: m.group(1) + "(" + str( offset_index.get(m.group(2),m.group(2))) + ")"
         },
        
