@@ -45,6 +45,13 @@ def gen_header(filename, funcname):
     flags = ["FZ","FN"]
     header += wr_newline( "=".join(flags) + "=0",0,1)
     
+    header += wr_newline("#Create registers")
+    # manage AL, AH...
+    regs = ["eax","ebx","ecx","edx",
+            "edi","esi","eip","esp","ebp"]
+
+    header += wr_newline( "=".join(regs) + "=0",0,1)
+
     header += wr_newline("def cmp(x,y):")
     header += wr_newline("global FZ",1)
     header += wr_newline("global FN",1)
@@ -92,18 +99,23 @@ def gen_header(filename, funcname):
     header += wr_newline("if(not FZ):",1)
     header += wr_newline("goto(addr-1)",2)
 
+    header += wr_newline("def div(val):")
+    header += wr_newline("global eax,edx",1)
+    header += wr_newline("edx = 0",1)
+    header += wr_newline("edx = eax % val",1)
+    header += wr_newline("eax = eax / val",1,1)
+
+    header += wr_newline("def mul(nb):")
+    header += wr_newline("global eax,edx",1)
+    header += wr_newline("tmp = eax * nb",1)
+    header += wr_newline("eax = tmp & 0xFFFFFFFF",1)
+    header += wr_newline("edx = tmp / 0xFFFFFFFF",1,1)
+
     header += wr_newline("nop = lambda : None",0,1)
-
-    header += wr_newline("#Create registers")
-    # manage AL, AH...
-    regs = ["eax","ebx","ecx","edx",
-            "edi","esi","eip","esp","ebp"]
-
-    header += wr_newline( "=".join(regs) + "=0",0,1)
 
     # Local vars
     header += wr_newline("# Local variables")
-    header += wr_newline( "".join(["locvar"+str(i)+"=0\n" for i in range(0,11)]),0,1)
+    header += wr_newline( "".join(["locvar"+str(i)+"=0\n" for i in range(1,11)]),0,1)
 
     header += wr_newline("def print_regs():")
     header += wr_newline("print('Registers Dump')",1)
@@ -277,6 +289,8 @@ def bulk_transform(raw_func):
         {"from" : r"sub ([a-z]+),([0-9a-z]*)", "to":r"\1 -= \2"},
         {"from" : r"inc ([a-z]+)", "to":r"\1 += 1"},
         {"from" : r"dec ([a-z]+)", "to":r"\1 -= 1"},
+        {"from" : r"i?(mul) ([a-z0-9]+)", "to":r"\1(\2)"},
+        {"from" : r"i?(div) ([a-z0-9]+)", "to":r"\1(\2)"},
 
         # Stack
         {"from" : r"push ([a-z0-9]+)", "to": r"stack.append(\1)"},
