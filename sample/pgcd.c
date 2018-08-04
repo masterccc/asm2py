@@ -1,17 +1,20 @@
 #include<stdio.h>
 
-int pgcd(int a, int b)
+int pgcd(int p, int s)
 {
 
-	register int r,x,y;
+	register int a,b,r,x,y;
 
-	if (a>b){
-		x=b;
-		r=a%b;
+
+	if (p>s){
+		x=p;
+		y=s;
 	} else {
-		x=a;
-		r=b%a;
+		x=s;
+		y=p;
 	}
+
+	r = a% b ;
 
 	while(r!=0){
 		y=x;

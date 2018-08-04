@@ -22,9 +22,9 @@ RE_FUNC = r'^[0-9a-f]+ <[a-zA-Z_]*>'
 
 offset_index = {}
 
-REMOVE_DWORD_PTR = True
+warning_locals = False
 trash_funcs = [
-    "__x86.get_pc_thunk.ax", "cdq"
+    "__x86.get_pc_thunk.ax" #, "cdq"
 ]
 def wr_newline(txt, tab=0, nl=0):
     return tab * TAB + txt + "\n" + nl * "\n"
@@ -52,9 +52,12 @@ def gen_header(filename, funcname):
 
     header += wr_newline( "=".join(regs) + "=0",0,1)
 
+    header += wr_newline("def cdq():")
+    header += wr_newline("global edx,eax",1)
+    header += wr_newline("edx = 0 if eax >=0 else 0xFFFFFFFF:",1,1)
+
     header += wr_newline("def cmp(x,y):")
-    header += wr_newline("global FZ",1)
-    header += wr_newline("global FN",1)
+    header += wr_newline("global FZ,FN",1)
     header += wr_newline("FZ = True if x == y else False",1)
     header += wr_newline("FN = True if ( (x-y) < 0) else False",1,1)
 
@@ -70,8 +73,7 @@ def gen_header(filename, funcname):
     header += wr_newline("goto(addr-1)",2)
 
     header += wr_newline("def jge(addr):")
-    header += wr_newline("global FN",1)
-    header += wr_newline("global FZ",1)
+    header += wr_newline("global FN,FZ",1)
     header += wr_newline("if(not FN or FZ):",1)
     header += wr_newline("goto(addr-1)",2)
     header += wr_newline("jae = jge",0,1)
@@ -82,8 +84,7 @@ def gen_header(filename, funcname):
     header += wr_newline("goto(addr-1)",2)
 
     header += wr_newline("def jle(addr):")
-    header += wr_newline("global FN",1)
-    header += wr_newline("global FZ",1)
+    header += wr_newline("global FN,FZ",1)
     header += wr_newline("if(FN or FZ):",1)
     header += wr_newline("goto(addr-1)",2)
     header += wr_newline("jbe = jle",0,1)
@@ -223,24 +224,30 @@ space_padding = lambda line : LINE_NR_PADDING - len(line)
 
 def analyze(raw_func, ofile):
 
-    global cur_func
+    global cur_func, warning_locals
 
     raw_func = bulk_transform(raw_func)
-    instructions = ""
+    inst = ""
     line_nr = 0
     for line in raw_func.split("\n"):
+
         if line == "":
             continue
-        
+        try:
+            if line.index("locvar"):
+                warning_locals = True
+        except:
+            pass
+
         opcodes = " ".join(line.split()[2:]) # default (copy)
-        
-        instructions += TAB + "'"+ opcodes + "',"
-        instructions += " " * space_padding(opcodes)
-        instructions += "#" + str(hex(line_nr))
-        instructions += " (" + str(line_nr) +")"+"\n"
+        inst += TAB + "'"+ opcodes + "',"
+        inst += " " * space_padding(opcodes)
+        inst += "#" + str(hex(line_nr))
+        inst += " (" + str(line_nr) +")"+"\n"
         line_nr += 1
-    instructions += "]\n" # end of ins
-    ofile.write(instructions)
+
+    inst += "]\n" # end of ins
+    ofile.write(inst)
 
 
 def bulk_transform(raw_func):
@@ -261,15 +268,13 @@ def bulk_transform(raw_func):
             "to": lambda m: "locvar" + str( int((int(m.group(1),16) / 4 -1)) )
         },
 
-
-
         # General 
         {"from" : r"mov ([a-z]+),([0-9a-z]*)", "to":r"\1 = \2"},
         {"from" : r"xchg ([a-z]+),([a-z]+)", "to":r"\1, \2 = \2, \1"},
         {"from" : r"ret", "to":r"print(\\'End\\')"},
         {"from" : r"lea ([a-z]+),\[([0-9a-z\-\*\+]+)\]","to":r"\1 = \2"},
         {"from" : r"(cmp|test) ([a-z]+),([0-9a-z]+)","to":r"cmp(\2,\3)"},
-        
+        {"from" : r"cdq", "to":r"cdq()"},
         #Control flow
         # Hexa
         {
@@ -326,3 +331,10 @@ output_file.close()
 
 print("Output file : ", sys.argv[1]+ '::' + cur_func + ".py")
 
+if(warning_locals):
+    print("Use of parameter has been detected, don't forget to set them it the dedicated section :")
+    print("# Local variables")
+    print("locvar1=768")
+    print("locvar2=128")
+    print("locvar3=0")
+    print("  ...")
