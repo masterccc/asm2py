@@ -25,13 +25,13 @@ This simple program computes a Fibonacci serie.
 ## Run main.py
 
 ```
-python3 main.py
+python3 main.py fibbo
 ```
 
 When the list appears, select fibbo's function number
 
 ```
-$ python3 main.py fibbo32
+$ python3 main.py fibbo
 1 : _init
 2 : _start
 3 : deregister_tm_clones
