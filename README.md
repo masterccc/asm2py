@@ -49,16 +49,6 @@ $ python3 main.py fibbo
 Function to pythonize ? [1-11]8
 Selected function : fibbo
 ```
-## Functions Parameters
-
-Some functions need parameters to run you can set them in the generated script :
-
-```
-# Local variables
-locvar1=768
-locvar2=128
-locvar3=0
-```
 
 ## Read and edit fibbo::fibbo.py
 
@@ -158,6 +148,29 @@ ebp = 0
 ```
 
 edx contains the result of the ```fibbo()``` function.
+
+## Functions Parameters
+
+Some functions need parameters (```fibbo``` doesn't, ```pgcd``` does) to run you can set them in the generated script :
+
+```
+# Local variables
+locvar1=768
+locvar2=128
+locvar3=0
+```
+
+## Blacklist call/addresses/lines
+
+You can disable the conversion of some opcodes, jumps or everything else that is present in the assembly code. It will not appear in the generated python script.
+
+Use the trash_funcs array :
+
+```
+trash_funcs = [
+    "__x86.get_pc_thunk.ax"
+]
+```
 
 # Other examples
 
