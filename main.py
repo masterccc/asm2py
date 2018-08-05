@@ -54,7 +54,7 @@ def gen_header(filename, funcname):
 
     header += wr_newline("def cdq():")
     header += wr_newline("global edx,eax",1)
-    header += wr_newline("edx = 0 if eax >=0 else 0xFFFFFFFF:",1,1)
+    header += wr_newline("edx = 0 if eax >=0 else 0xFFFFFFFF",1,1)
 
     header += wr_newline("def cmp(x,y):")
     header += wr_newline("global FZ,FN",1)
@@ -266,6 +266,10 @@ def bulk_transform(raw_func):
         {
             "from": r"\[ebp\+(0x[a-f0-9]+)\]",
             "to": lambda m: "locvar" + str( int((int(m.group(1),16) / 4 -1)) )
+        },
+        {
+            "from": r"(cmp|test) ([a-z]+),([0-9a-z]+)",
+            "to": lambda m: "cmp(" + m.group(2) + ',0)' if m.group(2) == m .group(3) else "cmp("+m.group(2)+','+m.group(3)+')'
         },
 
         # General 

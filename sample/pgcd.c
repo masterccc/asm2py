@@ -3,31 +3,31 @@
 int pgcd(int p, int s)
 {
 
-	register int a,b,r,x,y;
+	register int c,d,r;
 
-
-	if (p>s){
-		x=p;
-		y=s;
+	if (p > s)
+	{
+		c = p;
+		d = s;
 	} else {
-		x=s;
-		y=p;
+		c=s;
+		d=p;
 	}
 
-	r = a% b ;
+	r= c % d;
 
 	while(r!=0){
-		y=x;
-		x=r;
-		r=y%x;          
+		c = d;
+		d = r;
+		r = c % d;
 	}
-	
-	return x ;
+
+	return d ;
 }
 
 int main(void){
 
-	printf("pgcd(512,768) = %d\n", pgcd(512,768));
+	printf("pgcd(758,306) = %d\n", pgcd(758,306));
 
 	return 0 ;
 }
