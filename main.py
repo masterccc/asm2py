@@ -1,11 +1,11 @@
 #!/usr/bin/python3
 
 # Todo:
-# op code: div/idiv mul/imul
 # eax -> ax -> ah/al
 # opcode reg/hex/dec,reg/hex/dec
 # read/write -> print/input
 # 0x.... -> .data string
+# draw graph
 # regex \d \w etc..
 
 import os, sys, re
@@ -220,17 +220,87 @@ def get_raw_func(raw_asm,func_name):
 
     return raw
 
-space_padding = lambda line : LINE_NR_PADDING - len(line)
+space_padding = lambda line : 10 - len(line)
+
+
+def draw_graph(raw, max_line_nr, line_nr):
+    
+    global cur_func
+    lines = ""
+    line_nr = 0
+
+    jmp_re = r"(call|jmp|jne|je|jz|jg|jl|jle|jbe|jge|jae)\(([0-9]+)\)"
+    jmp_rec = re.compile(jmp_re)
+
+    raw_tab = raw.split("\n")
+    indent_lvl = {}
+    nb_indent = 1
+    tojumps = []
+
+    for i in range(1,len(raw_tab)-1):
+
+        li = raw_tab[i]
+        find_jmp = jmp_rec.search(li)
+        print(raw_tab[i])
+        if(find_jmp):
+            fromjmp = i
+            tojmp = int(find_jmp.group(2),16)
+            tojumps.append([tojmp,nb_indent])
+            print("Jump found:",i,"from",fromjmp,"to",tojmp)
+            maxl,minl=max(fromjmp,tojmp),min(fromjmp,tojmp)
+            lines += li + (len(",''") + len(TAB) + max_line_nr - len(li) + 1 + nb_indent * 2) * '>' + '+'
+            
+            for j in range(minl,maxl+1):
+                if str(j) not in indent_lvl.keys():
+                    indent_lvl[str(j)] = [nb_indent]
+                else:
+                    indent_lvl[str(j)].append(nb_indent)
+            nb_indent +=1
+        else:
+            lines += li
+        lines+="\n"
+     #   lines += line + "#" + str(hex(line_nr))
+      #  lines += " (" + str(line_nr) +")"+"\n"
+    print(lines)
+
+    raw_tab = lines.split("\n")
+    lines = ""
+    for i in range(1,len(raw_tab)-1):
+        li = raw_tab[i]
+        if str(i) in indent_lvl.keys():
+            #if i in tojumps:
+            #    lines += li + (max_line_nr - len(li) + i[1] * 2) * '<'  
+            #else:
+            lines += li + (max_line_nr - len(li) + nb_indent * 2) * 'o'  
+            for l in range(1,6):
+                if l in indent_lvl[str(i)]:
+                    lines += '|  '
+                else:
+                    lines += '  '
+            #lines += str(sorted(indent_lvl[str(i)]))
+            # for level in range(0,indent_lvl[str(i)]):
+             #   lines += '|  '# + ' ' * 2 #(indent_lvl[str(i)] - k) * ' ' + '|'
+  
+        else:
+            lines += li
+        lines += "\n"
+        # Ajout "|"
+
+        #Ajout ligne 0x34 52
+
+
+    print(lines)
+    return raw
 
 def analyze(raw_func, ofile):
 
     global cur_func, warning_locals
 
     raw_func = bulk_transform(raw_func)
-    inst = ""
-    line_nr = 0
+    tmpl = inst = ""
+    maxlen = line_nr = 0
     for line in raw_func.split("\n"):
-
+        tmpl = ""
         if line == "":
             continue
         try:
@@ -240,13 +310,16 @@ def analyze(raw_func, ofile):
             pass
 
         opcodes = " ".join(line.split()[2:]) # default (copy)
-        inst += TAB + "'"+ opcodes + "',"
-        inst += " " * space_padding(opcodes)
-        inst += "#" + str(hex(line_nr))
-        inst += " (" + str(line_nr) +")"+"\n"
+        tmpl += TAB + "'"+ opcodes + "'," + "\n"
+        #tmpl += " " * space_padding(opcodes) + '\n'
+        
+        maxlen = max(len(tmpl),maxlen)
+
+        inst += tmpl
         line_nr += 1
 
     inst += "]\n" # end of ins
+    inst = draw_graph(inst, maxlen,line_nr)
     ofile.write(inst)
 
 
