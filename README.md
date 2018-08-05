@@ -1,10 +1,10 @@
 # Asm2py - Assembly to python converter
 
-/!\ Experimental prototype. 32 bits only. It doesn't cover all opcodes, all registers (or sub registers) or some memory manipulations (there is not stack yet, no .data section, etc...). Some C adjustement may be required (like register variables).
+/!\ Experimental prototype. 32 bits only. It doesn't cover all opcodes, all registers (or sub registers) or some memory manipulations (there is not stack yet, no .data section, etc...). Some adjustements may be required in the source code of the target binary to make the conversion easier (like register variables if C is used).
 
 # Wut ?
 
-Asm2py converts assembly functions (dumped from an ELF binary via  objdump) to python instructions. The program allows you to select a function to analyze and converts it to python. Once the python script is generated you can execute and debug it. It can help to understand some (simple) assembly pieces of code for a better understanding or reverse engineering purposes.
+Asm2py converts assembly functions (dumped from an ELF binary via objdump) to python instructions. The program allows you to select a function to analyze and converts it to python. The generated python instructions take place inside a new file. Once the python script is generated you can execute and debug it. It can help to understand some (simple) assembly pieces of code for a better understanding or reverse engineering purposes.
 
 
 # Dependancies
@@ -26,9 +26,12 @@ This simple program computes a Fibonacci serie.
 
 ```
 python3 main.py fibbo
+or
+chmod +x main.py
+./main.py fibbo
 ```
 
-When the list appears, select fibbo's function number
+When the following list appears, select fibbo's function number :
 
 ```
 $ python3 main.py fibbo
@@ -46,10 +49,20 @@ $ python3 main.py fibbo
 Function to pythonize ? [1-11]8
 Selected function : fibbo
 ```
+## Functions Parameters
+
+Some functions need parameters to run you can set them in the generated script :
+
+```
+# Local variables
+locvar1=768
+locvar2=128
+locvar3=0
+```
 
 ## Read and edit fibbo::fibbo.py
 
-This file contains assembly instruction converted to python :
+This file contains assembly instructions converted to python :
 
 ```python
 ins = [
@@ -74,7 +87,7 @@ You can execute some piece of code when a line is reached during execution with 
 debug_instructions = { REACHED_LINE: 'STR_PAYLOAD'}
 ```
 
-Exemple :
+### Exemple :
 
 ```
 debug_instructions = { 0 : 'print("Debug starts")'}
@@ -94,7 +107,7 @@ debug_instructions = { 11 : 'print_regs()'}
 
 ```python3 fibbo::fibbo.py```
 
-Output (with debug before cmp as mentionned above):
+Output (with a debug instruction placed before execution of ```cmp``` opcode):
 
 ```
 eip :  0 inst:  stack.append(ebp)
@@ -145,3 +158,7 @@ ebp = 0
 ```
 
 edx contains the result of the ```fibbo()``` function.
+
+# Other examples
+
+A ```pgcd.c``` example is available is ```sample/```. It uses function with arguments.
